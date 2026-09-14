@@ -285,9 +285,13 @@
   .you-name { font-family: 'Playfair Display', serif; font-weight: 400; font-size: 30px; line-height: 1.1; margin-bottom: 18px; letter-spacing: -0.01em; }
   .you-name em { font-style: italic; color: var(--gold-d); }
   .you .facts { margin-top: 0; }
-  .you-out { display: inline-block; margin-top: 18px; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--fog); text-decoration: none; border: 0; border-bottom: 1px solid var(--hair-d); padding: 0 0 2px; cursor: pointer; background: none; font-family: inherit; }
+  .you-out { display: inline-block; margin-top: 18px; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--fog); text-decoration: none; border: 0; border-bottom: 1px solid var(--hair-d); padding: 0 0 2px; cursor: pointer; background: none; font-family: inherit; white-space: nowrap; }
   .you-out:hover { color: var(--gold-d); border-color: var(--gold-d); }
   .hidden { display: none !important; }
+  body.signed-in #you, body.signed-in #rsvp-out { display: none; }
+  body:not(.signed-in) #welcome, body:not(.signed-in) #rsvp-in { display: none; }
+  .welcome .you-box { margin-top: 0; }
+  .welcome .you-name { font-size: 34px; }
 
   footer {
     background: var(--night);
@@ -370,6 +374,17 @@
     </div>
     <div class="cd-note">until first chairlift</div>
   </header>
+
+  <!-- WELCOME (signed in) -->
+  <section class="you welcome" id="welcome">
+    <div class="label">Your details</div>
+    <div class="you-box">
+      <div class="you-name">Welcome, <em id="you-first"></em>.</div>
+      <ul class="facts" id="you-facts"></ul>
+      <p id="you-nodata" class="hidden">You're signed in, but I haven't added your details yet — check back after the RSVP deadline.</p>
+      <button class="you-out" id="you-signout">Sign out</button>
+    </div>
+  </section>
 
   <!-- OCCASION -->
   <section class="reveal">
@@ -485,21 +500,22 @@
         <p>I've sent a sign-in link to <b id="you-sent-to"></b>. Tap it and you'll land back here, signed in. It's good for an hour.</p>
         <button class="you-out" id="you-retry">Use a different email</button>
       </div>
-      <div id="you-in" class="hidden">
-        <div class="you-name">Welcome, <em id="you-first"></em>.</div>
-        <ul class="facts" id="you-facts"></ul>
-        <p id="you-nodata" class="hidden">You're signed in, but I haven't added your details yet — check back after the RSVP deadline.</p>
-        <button class="you-out" id="you-signout">Sign out</button>
-      </div>
     </div>
   </section>
 
   <!-- RSVP -->
   <section class="rsvp">
+    <div id="rsvp-out">
     <div class="label">RSVP</div>
     <h2>Tell me you're coming</h2>
     <p>Fill this in so I can plan properly — the earlier the better, especially for the restaurant bookings. <strong>Latest by October 31st</strong>, please.</p>
     <a class="btn" href="https://docs.google.com/forms/d/e/1FAIpQLSdGr6zkU-dqfgD_ShMq5mdujoszPCYfSXCRDLWbBKjrQmCe1Q/viewform?usp=publish-editor" target="_blank" rel="noopener">Fill in the RSVP form →</a>
+    </div>
+    <div id="rsvp-in">
+    <div class="label">Plans changed?</div>
+    <h2>Tell me if anything's <em>changed</em></h2>
+    <p>You've already RSVP'd, so nothing more to fill in. If your dates, plus-one or accommodation change, just WhatsApp me and I'll update your details here.</p>
+    </div>
   </section>
 
   <footer>
@@ -585,36 +601,46 @@
       { auth: { flowType: 'implicit', detectSessionInUrl: true, persistSession: true } }
     );
     var $ = function (id) { return document.getElementById(id); };
-    var login = $('you-login'), sent = $('you-sent'), inn = $('you-in'), msg = $('you-msg');
-    function show(el) { [login, sent, inn].forEach(function (e) { e.classList.toggle('hidden', e !== el); }); }
+    var login = $('you-login'), sent = $('you-sent'), msg = $('you-msg');
+    function show(el) { [login, sent].forEach(function (e) { e.classList.toggle('hidden', e !== el); }); }
     function say(t, err) { msg.textContent = t; msg.classList.toggle('err', !!err); msg.classList.toggle('hidden', !t); }
     function fmt(d) { if (!d) return ''; var dt = new Date(d + 'T12:00:00'); return dt.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' }); }
     function row(k, v) { return v ? '<li><span class="fk">' + k + '</span><span>' + v + '</span></li>' : ''; }
     function esc(s) { return String(s).replace(/[&<>]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]; }); }
 
+    var SKIP = { id: 1, email: 1, created_at: 1, first_name: 1, last_name: 1 };
+    var ORDER = ['accommodation', 'address', 'room', 'arrival_day', 'leaving_date', 'departure_day', 'sport', 'sauvage', 'la_folie_douce', 'party_size', 'plus_one_name', 'dietary', 'notes'];
+    var LABEL = { accommodation: 'Staying at', arrival_day: 'Arriving', leaving_date: 'Leaving', departure_day: 'Leaving', sport: 'On the mountain', sauvage: 'Sauvage', la_folie_douce: 'La Folie Douce', party_size: 'Party of', plus_one_name: 'Plus one' };
+    function label(k) { return LABEL[k] || (k.charAt(0).toUpperCase() + k.slice(1)).replace(/_/g, ' '); }
+    function val(v) { if (v === null || v === undefined || v === '') return ''; if (v === true) return "You're in"; if (v === false) return 'Not this time'; return /^\d{4}-\d{2}-\d{2}$/.test(v) ? fmt(v) : esc(v); }
+
+    var DEMO = /[?&]demo=1/.test(location.search);
     function render(user) {
-      show(inn);
+      document.body.classList.add('signed-in'); show(login);
       $('you-first').textContent = (user.email || '').split('@')[0];
-      sb.from('guests').select('*').ilike('email', user.email).maybeSingle().then(function (r) {
+      var q = DEMO
+        ? Promise.resolve({ data: { first_name: 'Lisa', accommodation: 'Chalet Combloux', room: 'Room 2, double', arrival_day: '2027-02-24', departure_day: '2027-02-28', notes: 'Transfer from GVA at 15:40 — look for Jake at arrivals.' } })
+        : sb.from('guests').select('*').ilike('email', user.email).maybeSingle();
+      q.then(function (r) {
         var g = r.data;
         if (!g) { $('you-facts').innerHTML = ''; $('you-nodata').classList.remove('hidden'); return; }
         $('you-nodata').classList.add('hidden');
         if (g.first_name) $('you-first').textContent = g.first_name;
-        $('you-facts').innerHTML =
-          row('Staying at', esc(g.accommodation || '')) +
-          row('Room', esc(g.room || '')) +
-          row('Arriving', fmt(g.arrival_day)) +
-          row('Notes', esc(g.notes || ''));
+        var keys = ORDER.filter(function (k) { return k in g; }).concat(Object.keys(g).filter(function (k) { return ORDER.indexOf(k) < 0 && !SKIP[k]; }));
+        var html = keys.map(function (k) { return row(label(k), val(g[k])); }).join('');
+        $('you-facts').innerHTML = html;
+        if (!html) $('you-nodata').classList.remove('hidden');
       });
     }
 
     var qs = new URLSearchParams(location.hash.replace(/^#/, '') || location.search);
     if (qs.get('error_description')) { say(qs.get('error_description').replace(/\+/g, ' '), true); history.replaceState(null, '', location.pathname + '#you'); }
-    if (location.hash.indexOf('access_token') > -1 || qs.get('error')) { setTimeout(function () { document.getElementById('you').scrollIntoView && window.scrollTo(0, document.getElementById('you').offsetTop - 20); }, 300); }
+    if (location.hash.indexOf('access_token') > -1 || qs.get('error')) { setTimeout(function () { window.scrollTo(0, document.getElementById(document.body.classList.contains('signed-in') ? 'welcome' : 'you').offsetTop - 20); }, 300); }
+    if (DEMO) render({ email: 'lisa@example.com' });
     sb.auth.getSession().then(function (r) { if (r.data.session) render(r.data.session.user); });
     sb.auth.onAuthStateChange(function (ev, s) {
-      if (s && s.user) { render(s.user); if (location.hash.indexOf('access_token') > -1) history.replaceState(null, '', location.pathname + '#you'); }
-      else if (ev === 'SIGNED_OUT') show(login);
+      if (s && s.user) { render(s.user); if (location.hash.indexOf('access_token') > -1) history.replaceState(null, '', location.pathname + '#welcome'); }
+      else if (ev === 'SIGNED_OUT') { document.body.classList.remove('signed-in'); show(login); }
     });
 
     $('you-form').addEventListener('submit', function (e) {
