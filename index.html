@@ -581,7 +581,8 @@
     if (!window.supabase) return;
     var sb = window.supabase.createClient(
       'https://ggdonrnkxglgawvkdpgj.supabase.co',
-      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdnZG9ucm5reGdsZ2F3dmtkcGdqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkzNzc1NzYsImV4cCI6MjEwNDk1MzU3Nn0.uA6dm5TvbrExBzi0rGAoXH--KDvIe8q4hsTIyzqOZxA'
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdnZG9ucm5reGdsZ2F3dmtkcGdqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkzNzc1NzYsImV4cCI6MjEwNDk1MzU3Nn0.uA6dm5TvbrExBzi0rGAoXH--KDvIe8q4hsTIyzqOZxA',
+      { auth: { flowType: 'implicit', detectSessionInUrl: true, persistSession: true } }
     );
     var $ = function (id) { return document.getElementById(id); };
     var login = $('you-login'), sent = $('you-sent'), inn = $('you-in'), msg = $('you-msg');
@@ -607,6 +608,9 @@
       });
     }
 
+    var qs = new URLSearchParams(location.hash.replace(/^#/, '') || location.search);
+    if (qs.get('error_description')) { say(qs.get('error_description').replace(/\+/g, ' '), true); history.replaceState(null, '', location.pathname + '#you'); }
+    if (location.hash.indexOf('access_token') > -1 || qs.get('error')) { setTimeout(function () { document.getElementById('you').scrollIntoView && window.scrollTo(0, document.getElementById('you').offsetTop - 20); }, 300); }
     sb.auth.getSession().then(function (r) { if (r.data.session) render(r.data.session.user); });
     sb.auth.onAuthStateChange(function (ev, s) {
       if (s && s.user) { render(s.user); if (location.hash.indexOf('access_token') > -1) history.replaceState(null, '', location.pathname + '#you'); }
