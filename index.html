@@ -270,6 +270,25 @@
   }
   .btn:hover { background: #D8BC85; transform: translateY(-1px); }
 
+  /* your details (auth) */
+  .you { background: #FBFAF7; }
+  .you-box { border: 1px solid var(--hair-d); background: #fff; padding: 24px; margin-top: 8px; }
+  .you-box p { font-size: 14px; margin-bottom: 14px; }
+  .you-form { display: flex; flex-direction: column; gap: 10px; }
+  .you-form input { font: inherit; font-size: 15px; font-weight: 300; padding: 13px 14px; border: 1px solid var(--hair-d); background: #fff; color: var(--ink); outline: none; width: 100%; }
+  .you-form input:focus { border-color: var(--gold-d); }
+  .btn-dark { display: inline-block; background: var(--night); color: var(--snow); border: 0; cursor: pointer; font: inherit; font-size: 11.5px; font-weight: 500; letter-spacing: 0.18em; text-transform: uppercase; padding: 15px 30px; transition: background 0.25s ease; }
+  .btn-dark:hover { background: #22385E; }
+  .btn-dark:disabled { opacity: 0.5; cursor: default; }
+  .you-msg { font-size: 13px; color: var(--pine); margin-top: 10px; }
+  .you-msg.err { color: #9B4A3A; }
+  .you-name { font-family: 'Playfair Display', serif; font-weight: 400; font-size: 30px; line-height: 1.1; margin-bottom: 18px; letter-spacing: -0.01em; }
+  .you-name em { font-style: italic; color: var(--gold-d); }
+  .you .facts { margin-top: 0; }
+  .you-out { display: inline-block; margin-top: 18px; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--fog); text-decoration: none; border: 0; border-bottom: 1px solid var(--hair-d); padding: 0 0 2px; cursor: pointer; background: none; font-family: inherit; }
+  .you-out:hover { color: var(--gold-d); border-color: var(--gold-d); }
+  .hidden { display: none !important; }
+
   footer {
     background: var(--night);
     border-top: 1px solid var(--hair);
@@ -313,7 +332,7 @@
     .rsvp { padding: 96px 40px; }
 
     /* section tints run edge to edge, text stays in the column */
-    .stay { box-shadow: -50vw 0 0 #FBFAF7, 50vw 0 0 #FBFAF7; }
+    .stay, .you { box-shadow: -50vw 0 0 #FBFAF7, 50vw 0 0 #FBFAF7; }
     footer { box-shadow: -50vw 0 0 var(--night), 50vw 0 0 var(--night); }
 
     /* recommended hotels side by side */
@@ -448,6 +467,33 @@
     </ul>
   </section>
 
+  <!-- YOUR DETAILS -->
+  <section class="you reveal" id="you">
+    <div class="label">Your details</div>
+    <h2>Everything <em>you</em> need to know.</h2>
+    <div class="you-box">
+      <div id="you-login">
+        <p>Once you've RSVP'd, sign in with the email you gave me to see your accommodation, arrival day and any notes for you.</p>
+        <form class="you-form" id="you-form">
+          <input type="email" id="you-email" placeholder="your@email.com" autocomplete="email" required>
+          <button class="btn-dark" type="submit" id="you-send">Email me a sign-in link</button>
+        </form>
+        <div class="you-msg hidden" id="you-msg"></div>
+      </div>
+      <div id="you-sent" class="hidden">
+        <div class="you-name">Check your <em>inbox</em>.</div>
+        <p>I've sent a sign-in link to <b id="you-sent-to"></b>. Tap it and you'll land back here, signed in. It's good for an hour.</p>
+        <button class="you-out" id="you-retry">Use a different email</button>
+      </div>
+      <div id="you-in" class="hidden">
+        <div class="you-name">Welcome, <em id="you-first"></em>.</div>
+        <ul class="facts" id="you-facts"></ul>
+        <p id="you-nodata" class="hidden">You're signed in, but I haven't added your details yet — check back after the RSVP deadline.</p>
+        <button class="you-out" id="you-signout">Sign out</button>
+      </div>
+    </div>
+  </section>
+
   <!-- RSVP -->
   <section class="rsvp">
     <div class="label">RSVP</div>
@@ -528,6 +574,60 @@
   })();
 </script>
 <script src="image-slot.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script>
+  // ── Your details (Supabase magic link) ──
+  (function () {
+    if (!window.supabase) return;
+    var sb = window.supabase.createClient(
+      'https://ggdonrnkxglgawvkdpgj.supabase.co',
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdnZG9ucm5reGdsZ2F3dmtkcGdqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkzNzc1NzYsImV4cCI6MjEwNDk1MzU3Nn0.uA6dm5TvbrExBzi0rGAoXH--KDvIe8q4hsTIyzqOZxA'
+    );
+    var $ = function (id) { return document.getElementById(id); };
+    var login = $('you-login'), sent = $('you-sent'), inn = $('you-in'), msg = $('you-msg');
+    function show(el) { [login, sent, inn].forEach(function (e) { e.classList.toggle('hidden', e !== el); }); }
+    function say(t, err) { msg.textContent = t; msg.classList.toggle('err', !!err); msg.classList.toggle('hidden', !t); }
+    function fmt(d) { if (!d) return ''; var dt = new Date(d + 'T12:00:00'); return dt.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' }); }
+    function row(k, v) { return v ? '<li><span class="fk">' + k + '</span><span>' + v + '</span></li>' : ''; }
+    function esc(s) { return String(s).replace(/[&<>]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]; }); }
+
+    function render(user) {
+      show(inn);
+      $('you-first').textContent = (user.email || '').split('@')[0];
+      sb.from('guests').select('*').ilike('email', user.email).maybeSingle().then(function (r) {
+        var g = r.data;
+        if (!g) { $('you-facts').innerHTML = ''; $('you-nodata').classList.remove('hidden'); return; }
+        $('you-nodata').classList.add('hidden');
+        if (g.first_name) $('you-first').textContent = g.first_name;
+        $('you-facts').innerHTML =
+          row('Staying at', esc(g.accommodation || '')) +
+          row('Room', esc(g.room || '')) +
+          row('Arriving', fmt(g.arrival_day)) +
+          row('Notes', esc(g.notes || ''));
+      });
+    }
+
+    sb.auth.getSession().then(function (r) { if (r.data.session) render(r.data.session.user); });
+    sb.auth.onAuthStateChange(function (ev, s) {
+      if (s && s.user) { render(s.user); if (location.hash.indexOf('access_token') > -1) history.replaceState(null, '', location.pathname + '#you'); }
+      else if (ev === 'SIGNED_OUT') show(login);
+    });
+
+    $('you-form').addEventListener('submit', function (e) {
+      e.preventDefault();
+      var email = $('you-email').value.trim().toLowerCase();
+      var btn = $('you-send'); btn.disabled = true; say('');
+      sb.auth.signInWithOtp({ email: email, options: { shouldCreateUser: false, emailRedirectTo: location.origin + location.pathname } })
+        .then(function (r) {
+          btn.disabled = false;
+          if (r.error) { say(/not allowed|signups|not found/i.test(r.error.message) ? "That email isn't on the guest list — make sure it's the one you used in the RSVP form." : r.error.message, true); return; }
+          $('you-sent-to').textContent = email; show(sent);
+        });
+    });
+    $('you-retry').addEventListener('click', function () { show(login); });
+    $('you-signout').addEventListener('click', function () { sb.auth.signOut(); });
+  })();
+</script>
 
 <template id="__bundler_thumbnail" data-bg-color="#182A4A">
   <svg viewBox="0 0 1200 800" xmlns="http://www.w3.org/2000/svg">
